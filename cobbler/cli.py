@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301  USA
 """
 
-import optparse
+import argparse
 import os
 import sys
 import time
@@ -197,10 +197,10 @@ def n2s(data):
 
 def opt(options, k, defval=""):
     """
-    Returns an option from an Optparse values instance
+    Returns an option from an Argparse values instance
 
     :param options: The options object to search in.
-    :param k: The key which is in the optparse values instance.
+    :param k: The key which is in the argparse values instance.
     :param defval: The default value to return.
     :return: The value for the specified key.
     """
@@ -215,9 +215,9 @@ def opt(options, k, defval=""):
 
 def _add_parser_option_from_field(parser, field, settings):
     """
-    Add options from a field dynamically to an optparse instance.
+    Add options from a field dynamically to an argparse instance.
 
-    :param parser: The optparse instance to add the options to.
+    :param parser: The argparse instance to add the options to.
     :param field: The field to parse.
     :param settings: Global cobbler settings as returned from ``CollectionManager.settings()``
     """
@@ -247,13 +247,13 @@ def _add_parser_option_from_field(parser, field, settings):
     # add option to parser
     if isinstance(choices, list) and len(choices) != 0:
         description += " (valid options: %s)" % ",".join(choices)
-        parser.add_option(option_string, dest=name, help=description, choices=choices)
+        parser.add_argument(option_string, dest=name, help=description, choices=choices)
         for alias in aliases:
-            parser.add_option(alias, dest=name, help=description, choices=choices)
+            parser.add_argument(alias, dest=name, help=description, choices=choices)
     else:
-        parser.add_option(option_string, dest=name, help=description)
+        parser.add_argument(option_string, dest=name, help=description)
         for alias in aliases:
-            parser.add_option(alias, dest=name, help=description)
+            parser.add_argument(alias, dest=name, help=description)
 
 
 def add_options_from_fields(object_type, parser, fields, network_interface_fields, settings, object_action):
@@ -261,7 +261,7 @@ def add_options_from_fields(object_type, parser, fields, network_interface_field
     Add options to the command line from the fields queried from the Cobbler server.
 
     :param object_type: The object type to add options for.
-    :param parser: The optparse instance to add options to.
+    :param parser: The argparse instance to add options to.
     :param fields: The list of fields to add options for.
     :param network_interface_fields: The list of network interface fields if the object type is a system.
     :param settings: Global cobbler settings as returned from ``CollectionManager.settings()``
@@ -277,26 +277,26 @@ def add_options_from_fields(object_type, parser, fields, network_interface_field
             for field in network_interface_fields:
                 _add_parser_option_from_field(parser, field, settings)
 
-            parser.add_option("--interface", dest="interface", help="the interface to operate on (can only be "
+            parser.add_argument("--interface", dest="interface", help="the interface to operate on (can only be "
                                                                     "specified once per command line)")
             if object_action in ["add", "edit"]:
-                parser.add_option("--delete-interface", dest="delete_interface", action="store_true")
-                parser.add_option("--rename-interface", dest="rename_interface")
+                parser.add_argument("--delete-interface", dest="delete_interface", action="store_true")
+                parser.add_argument("--rename-interface", dest="rename_interface")
 
         if object_action in ["copy", "rename"]:
-            parser.add_option("--newname", help="new object name")
+            parser.add_argument("--newname", help="new object name")
 
         if object_action not in ["find"] and object_type != "setting":
-            parser.add_option("--in-place", action="store_true", default=False, dest="in_place",
+            parser.add_argument("--in-place", action="store_true", default=False, dest="in_place",
                               help="edit items in kopts or autoinstall without clearing the other items")
 
     elif object_action == "remove":
-        parser.add_option("--name", help="%s name to remove" % object_type)
-        parser.add_option("--recursive", action="store_true", dest="recursive", help="also delete child objects")
+        parser.add_argument("--name", help="%s name to remove" % object_type)
+        parser.add_argument("--recursive", action="store_true", dest="recursive", help="also delete child objects")
 
     # FIXME: not supported in 2.0 ?
     # if not object_action in ["dumpvars","find","remove","report","list"]:
-    #    parser.add_option("--no-sync",     action="store_true", dest="nosync", help="suppress sync for speed")
+    #    parser.add_argument("--no-sync",     action="store_true", dest="nosync", help="suppress sync for speed")
 
 
 class CobblerCLI:
@@ -313,7 +313,7 @@ class CobblerCLI:
         self.url_cobbler_xmlrpc = utils.local_get_cobbler_xmlrpc_url()
 
         # FIXME: allow specifying other endpoints, and user+pass
-        self.parser = optparse.OptionParser()
+        self.parser = argparse.ArgumentParser()
         self.remote = xmlrpc.client.Server(self.url_cobbler_api)
         self.shared_secret = utils.get_shared_secret()
         self.args = cliargs
@@ -504,21 +504,21 @@ class CobblerCLI:
         elif object_action in ["list", "autoadd"]:
             pass
         elif object_action not in ("reload", "update"):
-            self.parser.add_option("--name", dest="name", help="name of object")
+            self.parser.add_argument("--name", dest="name", help="name of object")
         elif object_action == "reload":
-            self.parser.add_option("--filename", dest="filename", help="filename to load data from")
-        (options, args) = self.parser.parse_args(self.args)
+            self.parser.add_argument("--filename", dest="filename", help="filename to load data from")
+        args = self.parser.parse_args(self.args)
 
         # the first three don't require a name
         if object_action == "report":
-            if options.name is not None:
-                report_item(self.remote, object_type, None, options.name)
+            if args.name is not None:
+                report_item(self.remote, object_type, None, args.name)
             else:
                 report_items(self.remote, object_type)
         elif object_action == "list":
             list_items(self.remote, object_type)
         elif object_action == "find":
-            items = self.remote.find_items(object_type, utils.strip_none(vars(options), omit_none=True), "name", False)
+            items = self.remote.find_items(object_type, utils.strip_none(vars(args), omit_none=True), "name", False)
             for item in items:
                 print(item)
         elif object_action == "autoadd" and object_type == "repo":
@@ -530,26 +530,26 @@ class CobblerCLI:
                 print("exception on server: %s" % emsg)
                 return 1
         elif object_action in OBJECT_ACTIONS:
-            if opt(options, "name") == "" and object_action not in ("reload", "update"):
+            if opt(args, "name") == "" and object_action not in ("reload", "update"):
                 print("--name is required")
                 return 1
             if object_action in ["add", "edit", "copy", "rename", "remove"]:
                 try:
                     if object_type == "setting":
                         settings = self.remote.get_settings()
-                        if options.value is None:
+                        if args.value is None:
                             raise RuntimeError("You must specify a --value when editing a setting")
                         elif not settings.get('allow_dynamic_settings', False):
                             raise RuntimeError("Dynamic settings changes are not enabled. Change the "
                                                "allow_dynamic_settings to True and restart cobblerd to enable dynamic "
                                                "settings changes")
-                        elif options.name == 'allow_dynamic_settings':
+                        elif args.name == 'allow_dynamic_settings':
                             raise RuntimeError("Cannot modify that setting live")
-                        elif self.remote.modify_setting(options.name, options.value, self.token):
+                        elif self.remote.modify_setting(args.name, args.value, self.token):
                             raise RuntimeError("Changing the setting failed")
                     else:
-                        self.remote.xapi_object_edit(object_type, options.name, object_action,
-                                                     utils.strip_none(vars(options), omit_none=True), self.token)
+                        self.remote.xapi_object_edit(object_type, args.name, object_action,
+                                                     utils.strip_none(vars(args), omit_none=True), self.token)
                 except xmlrpc.client.Fault as xxx_todo_changeme:
                     (err) = xxx_todo_changeme
                     (etype, emsg) = err.faultString.split(":", 1)
@@ -561,15 +561,15 @@ class CobblerCLI:
                     return 1
             elif object_action == "get-autoinstall":
                 if object_type == "profile":
-                    data = self.remote.generate_profile_autoinstall(options.name)
+                    data = self.remote.generate_profile_autoinstall(args.name)
                 elif object_type == "system":
-                    data = self.remote.generate_system_autoinstall(options.name)
+                    data = self.remote.generate_system_autoinstall(args.name)
                 print(data)
             elif object_action == "dumpvars":
                 if object_type == "profile":
-                    data = self.remote.get_blended_data(options.name, "")
+                    data = self.remote.get_blended_data(args.name, "")
                 elif object_type == "system":
-                    data = self.remote.get_blended_data("", options.name)
+                    data = self.remote.get_blended_data("", args.name)
                 # FIXME: pretty-printing and sorting here
                 keys = list(data.keys())
                 keys.sort()
@@ -578,13 +578,13 @@ class CobblerCLI:
             elif object_action in ["poweron", "poweroff", "powerstatus", "reboot"]:
                 power = {}
                 power["power"] = object_action.replace("power", "")
-                power["systems"] = [options.name]
+                power["systems"] = [args.name]
                 task_id = self.remote.background_power_system(power, self.token)
             elif object_action == "update":
-                task_id = self.remote.background_signature_update(utils.strip_none(vars(options), omit_none=True),
+                task_id = self.remote.background_signature_update(utils.strip_none(vars(args), omit_none=True),
                                                                   self.token)
             elif object_action == "reload":
-                filename = opt(options, "filename", "/var/lib/cobbler/distro_signatures.json")
+                filename = opt(args, "filename", "/var/lib/cobbler/distro_signatures.json")
                 try:
                     utils.load_signatures(filename, cache=True)
                 except:
@@ -594,9 +594,9 @@ class CobblerCLI:
                 else:
                     print("Signatures were successfully loaded")
             else:
-                raise NotImplementedException()
+                raise NotImplementedException("Not implemented yet!")
         else:
-            raise NotImplementedException()
+            raise NotImplementedException("Not implemented yet")
 
         # FIXME: add tail/polling code here
         if task_id != -1:
@@ -612,62 +612,62 @@ class CobblerCLI:
         """
         task_id = -1        # if assigned, we must tail the logfile
 
-        self.parser.set_usage('Usage: %%prog %s [options]' % (action_name))
+        #self.parser.usage('Usage: %%prog %s [options]' % (action_name))
 
         if action_name == "buildiso":
 
             defaultiso = os.path.join(os.getcwd(), "generated.iso")
-            self.parser.add_option("--iso", dest="iso", default=defaultiso, help="(OPTIONAL) output ISO to this file")
-            self.parser.add_option("--profiles", dest="profiles", help="(OPTIONAL) use these profiles only")
-            self.parser.add_option("--systems", dest="systems", help="(OPTIONAL) use these systems only")
-            self.parser.add_option("--tempdir", dest="buildisodir", help="(OPTIONAL) working directory")
-            self.parser.add_option("--distro", dest="distro", help="(OPTIONAL) used with --standalone and --airgapped "
+            self.parser.add_argument("--iso", dest="iso", default=defaultiso, help="(OPTIONAL) output ISO to this file")
+            self.parser.add_argument("--profiles", dest="profiles", help="(OPTIONAL) use these profiles only")
+            self.parser.add_argument("--systems", dest="systems", help="(OPTIONAL) use these systems only")
+            self.parser.add_argument("--tempdir", dest="buildisodir", help="(OPTIONAL) working directory")
+            self.parser.add_argument("--distro", dest="distro", help="(OPTIONAL) used with --standalone and --airgapped "
                                                                    "to create a distro-based ISO including all "
                                                                    "associated profiles/systems")
-            self.parser.add_option("--standalone", dest="standalone", action="store_true",
+            self.parser.add_argument("--standalone", dest="standalone", action="store_true",
                                    help="(OPTIONAL) creates a standalone ISO with all required distro files, "
                                         "but without any added repos")
-            self.parser.add_option("--airgapped", dest="airgapped", action="store_true",
+            self.parser.add_argument("--airgapped", dest="airgapped", action="store_true",
                                    help="(OPTIONAL) creates a standalone ISO with all distro and repo files for "
                                         "disconnected system installation")
-            self.parser.add_option("--source", dest="source", help="(OPTIONAL) used with --standalone to specify a "
+            self.parser.add_argument("--source", dest="source", help="(OPTIONAL) used with --standalone to specify a "
                                                                    "source for the distribution files")
-            self.parser.add_option("--exclude-dns", dest="exclude_dns", action="store_true",
+            self.parser.add_argument("--exclude-dns", dest="exclude_dns", action="store_true",
                                    help="(OPTIONAL) prevents addition of name server addresses to the kernel boot "
                                         "options")
-            self.parser.add_option("--mkisofs-opts", dest="mkisofs_opts", help="(OPTIONAL) extra options for mkisofs")
+            self.parser.add_argument("--mkisofs-opts", dest="mkisofs_opts", help="(OPTIONAL) extra options for mkisofs")
 
-            (options, args) = self.parser.parse_args(self.args)
-            task_id = self.start_task("buildiso", options)
+            args = self.parser.parse_args(self.args)
+            task_id = self.start_task("buildiso", args)
 
         elif action_name == "replicate":
-            self.parser.add_option("--master", dest="master", help="Cobbler server to replicate from.")
-            self.parser.add_option("--port", dest="port", help="Remote port.")
-            self.parser.add_option("--distros", dest="distro_patterns", help="patterns of distros to replicate")
-            self.parser.add_option("--profiles", dest="profile_patterns", help="patterns of profiles to replicate")
-            self.parser.add_option("--systems", dest="system_patterns", help="patterns of systems to replicate")
-            self.parser.add_option("--repos", dest="repo_patterns", help="patterns of repos to replicate")
-            self.parser.add_option("--image", dest="image_patterns", help="patterns of images to replicate")
-            self.parser.add_option("--mgmtclasses", dest="mgmtclass_patterns",
+            self.parser.add_argument("--master", dest="master", help="Cobbler server to replicate from.")
+            self.parser.add_argument("--port", dest="port", help="Remote port.")
+            self.parser.add_argument("--distros", dest="distro_patterns", help="patterns of distros to replicate")
+            self.parser.add_argument("--profiles", dest="profile_patterns", help="patterns of profiles to replicate")
+            self.parser.add_argument("--systems", dest="system_patterns", help="patterns of systems to replicate")
+            self.parser.add_argument("--repos", dest="repo_patterns", help="patterns of repos to replicate")
+            self.parser.add_argument("--image", dest="image_patterns", help="patterns of images to replicate")
+            self.parser.add_argument("--mgmtclasses", dest="mgmtclass_patterns",
                                    help="patterns of mgmtclasses to replicate")
-            self.parser.add_option("--packages", dest="package_patterns", help="patterns of packages to replicate")
-            self.parser.add_option("--files", dest="file_patterns", help="patterns of files to replicate")
-            self.parser.add_option("--omit-data", dest="omit_data", action="store_true", help="do not rsync data")
-            self.parser.add_option("--sync-all", dest="sync_all", action="store_true", help="sync all data")
-            self.parser.add_option("--prune", dest="prune", action="store_true",
+            self.parser.add_argument("--packages", dest="package_patterns", help="patterns of packages to replicate")
+            self.parser.add_argument("--files", dest="file_patterns", help="patterns of files to replicate")
+            self.parser.add_argument("--omit-data", dest="omit_data", action="store_true", help="do not rsync data")
+            self.parser.add_argument("--sync-all", dest="sync_all", action="store_true", help="sync all data")
+            self.parser.add_argument("--prune", dest="prune", action="store_true",
                                    help="remove objects (of all types) not found on the master")
-            self.parser.add_option("--use-ssl", dest="use_ssl", action="store_true",
+            self.parser.add_argument("--use-ssl", dest="use_ssl", action="store_true",
                                    help="use ssl to access the Cobbler master server api")
-            (options, args) = self.parser.parse_args(self.args)
-            task_id = self.start_task("replicate", options)
+            args = self.parser.parse_args(self.args)
+            task_id = self.start_task("replicate", args)
 
         elif action_name == "aclsetup":
-            self.parser.add_option("--adduser", dest="adduser", help="give acls to this user")
-            self.parser.add_option("--addgroup", dest="addgroup", help="give acls to this group")
-            self.parser.add_option("--removeuser", dest="removeuser", help="remove acls from this user")
-            self.parser.add_option("--removegroup", dest="removegroup", help="remove acls from this group")
-            (options, args) = self.parser.parse_args(self.args)
-            task_id = self.start_task("aclsetup", options)
+            self.parser.add_argument("--adduser", dest="adduser", help="give acls to this user")
+            self.parser.add_argument("--addgroup", dest="addgroup", help="give acls to this group")
+            self.parser.add_argument("--removeuser", dest="removeuser", help="remove acls from this user")
+            self.parser.add_argument("--removegroup", dest="removegroup", help="remove acls from this group")
+            args = self.parser.parse_args(self.args)
+            task_id = self.start_task("aclsetup", args)
 
         elif action_name == "version":
             version = self.remote.extended_version()
@@ -676,37 +676,37 @@ class CobblerCLI:
             print("  build time: %s" % version["builddate"])
 
         elif action_name == "hardlink":
-            (options, args) = self.parser.parse_args(self.args)
-            task_id = self.start_task("hardlink", options)
+            args = self.parser.parse_args(self.args)
+            task_id = self.start_task("hardlink", args)
         elif action_name == "reserialize":
-            (options, args) = self.parser.parse_args(self.args)
-            task_id = self.start_task("reserialize", options)
+            args = self.parser.parse_args(self.args)
+            task_id = self.start_task("reserialize", args)
         elif action_name == "status":
-            (options, args) = self.parser.parse_args(self.args)
+            args = self.parser.parse_args()
             print(self.remote.get_status("text", self.token))
         elif action_name == "validate-autoinstalls":
-            (options, args) = self.parser.parse_args(self.args)
-            task_id = self.start_task("validate_autoinstall_files", options)
+            args = self.parser.parse_args(self.args)
+            task_id = self.start_task("validate_autoinstall_files", args)
         elif action_name == "import":
-            self.parser.add_option("--arch", dest="arch", help="OS architecture being imported")
-            self.parser.add_option("--breed", dest="breed", help="the breed being imported")
-            self.parser.add_option("--os-version", dest="os_version", help="the version being imported")
-            self.parser.add_option("--path", dest="path", help="local path or rsync location")
-            self.parser.add_option("--name", dest="name", help="name, ex 'RHEL-5'")
-            self.parser.add_option("--available-as", dest="available_as", help="tree is here, don't mirror")
-            self.parser.add_option("--autoinstall", dest="autoinstall_file", help="assign this autoinstall file")
-            self.parser.add_option("--rsync-flags", dest="rsync_flags", help="pass additional flags to rsync")
-            (options, args) = self.parser.parse_args(self.args)
-            if options.path and "rsync://" not in options.path:
+            self.parser.add_argument("--arch", dest="arch", help="OS architecture being imported")
+            self.parser.add_argument("--breed", dest="breed", help="the breed being imported")
+            self.parser.add_argument("--os-version", dest="os_version", help="the version being imported")
+            self.parser.add_argument("--path", dest="path", help="local path or rsync location")
+            self.parser.add_argument("--name", dest="name", help="name, ex 'RHEL-5'")
+            self.parser.add_argument("--available-as", dest="available_as", help="tree is here, don't mirror")
+            self.parser.add_argument("--autoinstall", dest="autoinstall_file", help="assign this autoinstall file")
+            self.parser.add_argument("--rsync-flags", dest="rsync_flags", help="pass additional flags to rsync")
+            args = self.parser.parse_args(self.args)
+            if args.path and "rsync://" not in args.path:
                 # convert relative path to absolute path
-                options.path = os.path.abspath(options.path)
-            task_id = self.start_task("import", options)
+                args.path = os.path.abspath(args.path)
+            task_id = self.start_task("import", args)
         elif action_name == "reposync":
-            self.parser.add_option("--only", dest="only", help="update only this repository name")
-            self.parser.add_option("--tries", dest="tries", help="try each repo this many times", default=1)
-            self.parser.add_option("--no-fail", dest="nofail", help="don't stop reposyncing if a failure occurs", action="store_true")
-            (options, args) = self.parser.parse_args(self.args)
-            task_id = self.start_task("reposync", options)
+            self.parser.add_argument("--only", dest="only", help="update only this repository name")
+            self.parser.add_argument("--tries", dest="tries", help="try each repo this many times", default=1)
+            self.parser.add_argument("--no-fail", dest="nofail", help="don't stop reposyncing if a failure occurs", action="store_true")
+            args = self.parser.parse_args(self.args)
+            task_id = self.start_task("reposync", args)
         elif action_name == "check":
             results = self.remote.check(self.token)
             ct = 0
@@ -720,11 +720,11 @@ class CobblerCLI:
                 print("No configuration problems found.  All systems go.")
 
         elif action_name == "sync":
-            self.parser.add_option("--verbose", dest="verbose", action="store_true", help="run sync with more output")
-            (options, args) = self.parser.parse_args(self.args)
-            task_id = self.start_task("sync", options)
+            self.parser.add_argument("--verbose", dest="verbose", action="store_true", help="run sync with more output")
+            args = self.parser.parse_args(self.args)
+            task_id = self.start_task("sync", args)
         elif action_name == "report":
-            (options, args) = self.parser.parse_args(self.args)
+            args = self.parser.parse_args(self.args)
             print("distros:\n==========")
             report_items(self.remote, "distro")
             print("\nprofiles:\n==========")
@@ -745,7 +745,7 @@ class CobblerCLI:
             # no tree view like 1.6?  This is more efficient remotely
             # for large configs and prevents xfering the whole config
             # though we could consider that...
-            (options, args) = self.parser.parse_args(self.args)
+            args = self.parser.parse_args(self.args)
             print("distros:")
             list_items(self.remote, "distro")
             print("\nprofiles:")

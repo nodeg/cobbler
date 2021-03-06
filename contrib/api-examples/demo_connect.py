@@ -21,20 +21,20 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 """
 
 from xmlrpc.client import ServerProxy
-import optparse
+import argparse
 
 if __name__ == "__main__":
-    p = optparse.OptionParser()
-    p.add_option("-u","--user",dest="user",default="test")
-    p.add_option("-p","--pass",dest="password",default="test")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-u","--user",dest="user",default="test")
+    parser.add_argument("-p","--pass",dest="password",default="test")
 
     # NOTE: if you've changed your xmlrpc_rw port or
     # disabled xmlrpc_rw this test probably won't work
 
     sp = ServerProxy("http://127.0.0.1:25151")
-    (options, args) = p.parse_args()
-    print("- trying to login with user=%s" % options.user)
-    token = sp.login(options.user,options.password)
+    args = parser.parse_args()
+    print("- trying to login with user=%s" % args.user)
+    token = sp.login(args.user,args.password)
     print("- token: %s" % token)
     print("- authenticated ok, now seeing if user is authorized")
     check = sp.check_access(token,"imaginary_method_name")
